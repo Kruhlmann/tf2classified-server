@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+set -eu
+echo "[INFO] Launching server update scheduler"
+/usr/local/bin/tf-update-server &
+echo "[INFO] Launching server"
+exec "/home/${USERNAME}/classified/srcds.sh" -console -ip "${TF_HOST} "-port "${TF_PORT}" -tf_path "/home/${USERNAME}/tf" +map "${TF_STARTUP_MAP}" +maxplayers "${TF_MAX_PLAYERS}"

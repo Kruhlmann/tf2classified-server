@@ -1,0 +1,67 @@
+#!/usr/bin/env sh
+
+sourcemod_dir="/home/${USERNAME}/classified/tf2classified/addons/sourcemod"
+admins_file="${sourcemod_dir}/configs/admins_simple.ini"
+plugins_dir="${sourcemod_dir}/plugins"
+custom_plugins_dir="/data/mods"
+
+if test "${TF_ADMIN_STEAM_IDS+x}" = "x"; then
+    test -d "${sourcemod_dir}/configs" || {
+        echo "[ERROR] \$TF_ADMIN_STEAM_IDS is set but SourceMod is not installed"
+        return 1
+    }
+
+    : >"${admins_file}"
+    printf '%s\n' "${TF_ADMIN_STEAM_IDS}" | tr ',' '\n' | while IFS= read -r steam_id; do
+        steam_id="$(printf '%s' "${steam_id}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        test -z "${steam_id}" && continue
+
+        if ! printf '%s\n' "${steam_id}" | grep -Eq '^STEAM_[0-5]:[01]:[0-9]+$'; then
+            echo "[ERROR] Invalid Steam ID '${steam_id}' in \$TF_ADMIN_STEAM_IDS; expected STEAM_0:0:123456"
+            return 1
+        fi
+
+        printf '"%s" "99:z"\n' "${steam_id}" >>"${admins_file}"
+        echo "[INFO] Configured SourceMod administrator ${steam_id}"
+    done || return 1
+
+    chown "${USERNAME}:${USERNAME}" "${admins_file}"
+    chmod 0600 "${admins_file}"
+fi
+
+test -d "${custom_plugins_dir}" || return 0
+
+if find "${custom_plugins_dir}" -maxdepth 1 -type f -name '*.smx' | grep -q .; then
+    test -d "${plugins_dir}" || {
+        echo "[ERROR] Custom SourceMod plugins are present but SourceMod is not installed"
+        return 1
+    }
+fi
+
+test -d "${plugins_dir}" || return 0
+
+# Remove only symlinks managed by this script whose external plugin disappeared.
+find "${plugins_dir}" -maxdepth 1 -type l | while IFS= read -r plugin_link; do
+    link_target="$(readlink "${plugin_link}")"
+    case "${link_target}" in
+        "${custom_plugins_dir}/"*)
+            if ! test -f "${link_target}"; then
+                echo "[INFO] Removing stale managed SourceMod plugin $(basename "${plugin_link}")"
+                unlink "${plugin_link}"
+            fi
+            ;;
+    esac
+done
+
+find "${custom_plugins_dir}" -maxdepth 1 -type f -name '*.smx' | sort | while IFS= read -r plugin; do
+    plugin_file="$(basename "${plugin}")"
+    destination="${plugins_dir}/${plugin_file}"
+
+    if test -e "${destination}" && ! test -L "${destination}"; then
+        echo "[WARN] Not replacing installed SourceMod plugin ${plugin_file}"
+        continue
+    fi
+
+    ln -sfnT "${plugin}" "${destination}"
+    echo "[INFO] Linked SourceMod plugin ${plugin_file}"
+done

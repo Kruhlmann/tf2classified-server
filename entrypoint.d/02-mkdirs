@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+
+mkdir -p "/home/${USERNAME}/.steam/sdk64"
+mkdir -p /data/tf /data/classified/tf2classified/cfg
+
+# -T treats the destination as the link itself. Without it, restarting the
+# container follows the existing directory symlink and creates recursive links
+# such as /data/tf/tf -> /data/tf.
+ln -sfnT /data/tf "/home/${USERNAME}/tf"
+ln -sfnT /data/classified "/home/${USERNAME}/classified"
+
+chown -R "${USERNAME}:${USERNAME}" "/home/${USERNAME}" /opt/steamcmd /data/tf /data/classified
+return 0

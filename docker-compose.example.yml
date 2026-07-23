@@ -1,0 +1,227 @@
+services:
+    tf2classified:
+      image: tf2classified-server:latest
+      restart: unless-stopped
+      environment:
+        TF_PORT: 27015
+        TF_HOST: "0.0.0.0"
+        TF_SERVER_NAME: tf2classified
+        TF_MAX_PLAYERS: 24
+        TF_UPDATE_INTERVAL_SECONDS: 300
+        TF_CFG_DIR: /etc/tf/cfg.d
+        TF_STARTUP_MAP: cp_dustbowl
+        TF_MOTD: |
+          team fortress 2
+          enjoy
+        TF_MAP_ROTATION: |
+          cp_dustbowl
+          pl_badwater
+          pl_upward
+        TF_ADMIN_STEAM_IDS: |
+          STEAM_0:1:
+      env_file: ".env"
+      ports:
+        - "27015:27015/udp"
+      volumes:
+        - ./data/tf:/data/tf
+        - ./data/classified:/data/classified
+        - ./data/maps:/data/maps:ro
+        - ./data/mods:/data/mods:ro
+        - ./cfg.d:/etc/tf/cfg.d:ro
+      networks:
+        - tf2classified
+
+    rcon:
+      image: itzg/rcon
+      restart: unless-stopped
+      depends_on:
+        - tf2classified
+      environment:
+        RWA_USERNAME: admin
+        RWA_PASSWORD: ${RCON_WEB_PASSWORD}
+        RWA_ADMIN: "TRUE"
+        RWA_GAME: csgo
+        RWA_SERVER_NAME: TF2 Classified
+        RWA_RCON_HOST: tf2classified
+        RWA_RCON_PORT: 27015
+        RWA_RCON_PASSWORD: ${TF_RCON_PASSWORD}
+        RWA_WEBSOCKET_URL_SSL: wss://my.domain
+      env_file: ".env"
+      volumes:
+        - ./rcon:/opt/rcon-web-admin/db
+      networks:
+        - tf2classified
+        - web
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=web"
+        - "traefik.http.routers.tf2-rcon.rule=Host(`tf2classified.my.domain`)"
+        - "traefik.http.routers.tf2-rcon.entrypoints=https"
+        - "traefik.http.routers.tf2-rcon.tls=true"
+        - "traefik.http.routers.tf2-rcon.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.tf2-rcon.middlewares=media-auth"
+        - "traefik.http.routers.tf2-rcon.service=tf2-rcon-ui"
+        - "traefik.http.services.tf2-rcon-ui.loadbalancer.server.port=4326"
+        - "traefik.http.routers.tf2-rcon-ws.rule=Host(`rcon.my.domain`) && HeaderRegexp(`Upgrade`, `(?i)^websocket$`)"
+        - "traefik.http.routers.tf2-rcon-ws.priority=100"
+        - "traefik.http.routers.tf2-rcon-ws.entrypoints=https"
+        - "traefik.http.routers.tf2-rcon-ws.tls=true"
+        - "traefik.http.routers.tf2-rcon-ws.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.tf2-rcon-ws.middlewares=media-auth"
+        - "traefik.http.routers.tf2-rcon-ws.service=tf2-rcon-websocket"
+        - "traefik.http.services.tf2-rcon-websocket.loadbalancer.server.port=4327"
+        - "com.centurylinklabs.watchtower.enable=true"
+
+    fastdl:
+      image: nginx:alpine
+      container_name: tf2classified-fastdl
+      restart: unless-stopped
+      networks:
+        - web
+      volumes:
+        - ./data/maps:/usr/share/nginx/html/maps:ro
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=web"
+        - "traefik.http.routers.tf2classified_fastdl.rule=Host(`fastdl.my.domain`)"
+        - "traefik.http.routers.tf2classified_fastdl.entrypoints=https"
+        - "traefik.http.routers.tf2classified_fastdl.tls=true"
+        - "traefik.http.routers.tf2classified_fastdl.tls.certresolver=letsencrypt"
+        - "traefik.http.services.tf2classified_fastdl.loadbalancer.server.port=80"
+
+networks:
+  tf2classified:
+  web:
+    external: true
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# vim docker-compose.yml
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# docker compose down rcon
+[+] Running 2/2
+ ✔ Container tf2classified-rcon-1       Removed                                                                          10.5s
+ ! Network tf2classified_tf2classified  Resource is still in use                                                          0.0s
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# docker compose up -d rcon
+[+] Running 2/2
+ ✔ Container tf2classified-tf2classified-1  Running                                                                       0.0s
+ ✔ Container tf2classified-rcon-1           Started                                                                       0.8s
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# docker compose logs -f rcon
+^C
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# docker compose up -d rcon
+[+] Running 2/2
+ ✔ Container tf2classified-tf2classified-1  Running                                                                       0.0s
+ ✔ Container tf2classified-rcon-1           Running                                                                       0.0s
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# docker compose logs -f rcon
+^C
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# cat .env
+TF_RCON_PASSWORD=jsda8fsdfba0fbdsfahbdf0
+RCON_WEB_PASSWORD=jsda8fsdfba0fbdsfahbdf0
+
+[nix-shell:/mnt/hdd/docker/tf2classified]#   find data/classified/tf2classified/addons/sourcemod -name 'mapchooser.smx' -o -name 'rockthevote.smx'
+data/classified/tf2classified/addons/sourcemod/plugins/disabled/rockthevote.smx
+data/classified/tf2classified/addons/sourcemod/plugins/disabled/mapchooser.smx
+
+[nix-shell:/mnt/hdd/docker/tf2classified]#   cp data/classified/tf2classified/addons/sourcemod/plugins/disabled/mapchooser.smx data/mods/
+  cp data/classified/tf2classified/addons/sourcemod/plugins/disabled/rockthevote.smx data/mods/
+
+[nix-shell:/mnt/hdd/docker/tf2classified]# cat docker-compose.yml
+services:
+    tf2classified:
+      image: tf2classified-server:latest
+      restart: unless-stopped
+      environment:
+        TF_PORT: 27015
+        TF_HOST: "0.0.0.0"
+        TF_SERVER_NAME: "gescraft"
+        TF_MAX_PLAYERS: 24
+        TF_UPDATE_INTERVAL_SECONDS: 300
+        TF_CFG_DIR: /etc/tf/cfg.d
+        TF_STARTUP_MAP: cp_process_f12
+        TF_MOTD: |
+          team fortress 2
+          enjoy
+        TF_MAP_ROTATION: |
+          cp_process_f12
+          cp_dustbowl
+          pl_badwater
+          pl_upward
+        TF_ADMIN_STEAM_IDS: |
+          STEAM_0:1:51608359
+      env_file: ".env"
+      ports:
+        - "27015:27015/udp"
+      volumes:
+        - ./data/tf:/data/tf
+        - ./data/classified:/data/classified
+        - ./data/maps:/data/maps:ro
+        - ./data/mods:/data/mods:ro
+        - ./cfg.d:/etc/tf/cfg.d:ro
+      networks:
+        - tf2classified
+
+    rcon:
+      image: itzg/rcon
+      restart: unless-stopped
+      depends_on:
+        - tf2classified
+      environment:
+        RWA_USERNAME: admin
+        RWA_PASSWORD: ${RCON_WEB_PASSWORD}
+        RWA_ADMIN: "TRUE"
+        RWA_GAME: csgo
+        RWA_SERVER_NAME: TF2 Classified
+        RWA_RCON_HOST: tf2classified
+        RWA_RCON_PORT: 27015
+        RWA_RCON_PASSWORD: ${TF_RCON_PASSWORD}
+        RWA_WEBSOCKET_URL_SSL: wss://tf2classified.my.domain
+      env_file: ".env"
+      volumes:
+        - ./rcon:/opt/rcon-web-admin/db
+      networks:
+        - tf2classified
+        - web
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=web"
+        - "traefik.http.routers.tf2-rcon.rule=Host(`tf2classified.my.domain`)"
+        - "traefik.http.routers.tf2-rcon.entrypoints=https"
+        - "traefik.http.routers.tf2-rcon.tls=true"
+        - "traefik.http.routers.tf2-rcon.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.tf2-rcon.middlewares=media-auth"
+        - "traefik.http.routers.tf2-rcon.service=tf2-rcon-ui"
+        - "traefik.http.services.tf2-rcon-ui.loadbalancer.server.port=4326"
+        - "traefik.http.routers.tf2-rcon-ws.rule=Host(`tf2classified.my.domain`) && HeaderRegexp(`Upgrade`, `(?i)^websocket$`)"
+        - "traefik.http.routers.tf2-rcon-ws.priority=100"
+        - "traefik.http.routers.tf2-rcon-ws.entrypoints=https"
+        - "traefik.http.routers.tf2-rcon-ws.tls=true"
+        - "traefik.http.routers.tf2-rcon-ws.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.tf2-rcon-ws.middlewares=media-auth"
+        - "traefik.http.routers.tf2-rcon-ws.service=tf2-rcon-websocket"
+        - "traefik.http.services.tf2-rcon-websocket.loadbalancer.server.port=4327"
+        - "com.centurylinklabs.watchtower.enable=true"
+
+    fastdl:
+      image: nginx:alpine
+      container_name: tf2classified-fastdl
+      restart: unless-stopped
+      networks:
+        - web
+      volumes:
+        - ./data/maps:/usr/share/nginx/html/maps:ro
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=web"
+        - "traefik.http.routers.tf2classified_fastdl.rule=Host(`fastdl.my.domain`)"
+        - "traefik.http.routers.tf2classified_fastdl.entrypoints=https"
+        - "traefik.http.routers.tf2classified_fastdl.tls=true"
+        - "traefik.http.routers.tf2classified_fastdl.tls.certresolver=letsencrypt"
+        - "traefik.http.services.tf2classified_fastdl.loadbalancer.server.port=80"
+
+networks:
+  tf2classified:
+  web:
+    external: true

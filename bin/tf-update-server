@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+
+echo "[INFO] Generating /usr/local/bin/tf-update-server"
+
+cat >/tmp/tf-update-server.steamcmd <<EOF
+#!/usr/bin/env -S steamcmd +runscript
+@ShutdownOnFailedCommand 1
+@NoPromptForPassword 1
+force_install_dir /home/${USERNAME}/classified
+login anonymous
+app_update ${TF2_CLASSIFIED_APPID}
+quit
+EOF
+chmod 755 /tmp/tf-update-server.steamcmd
+
+while true; do
+    sleep "${TF_UPDATE_INTERVAL_SECONDS}"
+    echo "[INFO] Checking for updates"
+    /tmp/tf-update-server.steamcmd
+done

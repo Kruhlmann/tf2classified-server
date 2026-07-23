@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+
+test -d /data/maps || return 0
+
+maps_dir="/home/${USERNAME}/classified/tf2classified/maps"
+mkdir -p "${maps_dir}"
+
+find /data/maps -maxdepth 1 -type f -name '*.bsp' | sort | while IFS= read -r map; do
+    map_file="$(basename "${map}")"
+    destination="${maps_dir}/${map_file}"
+
+    if test -e "${destination}" && ! test -L "${destination}"; then
+        echo "[WARN] Not replacing installed map ${map_file} with /data/maps/${map_file}"
+        continue
+    fi
+
+    ln -sfnT "${map}" "${destination}"
+    echo "[INFO] Linked map ${map_file}->${destination}"
+done

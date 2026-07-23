@@ -1,0 +1,99 @@
+#!/usr/bin/env sh
+
+game_cfg_dir="/home/${USERNAME}/classified/tf2classified/cfg"
+generated_cfg="${game_cfg_dir}/generated.cfg"
+generated_cfg_dir="${game_cfg_dir}/generated.d"
+motd_file="${game_cfg_dir}/motd.txt"
+
+sv_password=""
+test -n "${TF_PASSWORD}" && {
+    sv_password="sv_password \"${TF_PASSWORD}\""
+}
+
+touch "${game_cfg_dir}/default.cfg"
+touch "${game_cfg_dir}/startup_manifest.cfg"
+cat >"${game_cfg_dir}/server.cfg" <<EOF
+hostname "${TF_SERVER_NAME}"
+sv_lan 0
+rcon_password "${TF_RCON_PASSWORD}"
+mapcyclefile "mapcycle.txt"
+sv_rcon_banpenalty 15
+sv_rcon_minfailures 15
+sv_rcon_maxfailures 15
+log on
+sv_logfile 1
+sv_logecho 1
+sv_logbans 1
+sv_pure -1
+sv_pure_kick_clients 0
+sv_alltalk 0
+mp_allowspectators 1
+mp_autoteambalance 1
+mp_teams_unbalance_limit 2
+mp_forcecamera 0
+sv_allow_wait_command 0
+sv_cheats 0
+sv_allowdownload 1
+net_maxfilesize 64
+sv_pausable 0
+mp_stalemate_enable 0
+mp_stalemate_timelimit 240
+mp_winlimit 0
+mp_timelimit 0
+tf_weapon_criticals 0
+tf_use_fixed_weaponspreads 0
+sv_maxrate 50000
+sv_minrate 7500
+sv_maxupdaterate 66
+sv_minupdaterate 20
+sv_maxcmdrate 66
+sv_mincmdrate 0
+${sv_password}
+exec generated.cfg
+EOF
+
+printf '%s\n' "${TF_MOTD}" >"${motd_file}"
+chown "${USERNAME}:${USERNAME}" "${motd_file}"
+echo "[INFO] Generated message of the day at ${motd_file}"
+
+: >"${generated_cfg}"
+
+if test -n "${TF_CFG_DIR}"; then
+    test -d "${TF_CFG_DIR}" || {
+        echo "[ERROR] \$TF_CFG_DIR specified but not present (${TF_CFG_DIR})"
+        return 1
+    }
+    mkdir -p "${generated_cfg_dir}"
+    find "${generated_cfg_dir}" -type f -name '*.cfg' -delete
+
+    find "${TF_CFG_DIR}" -type f -name '*.cfg' | sort | while read -r cfg; do
+        cfg_name="$(basename "${cfg}")"
+        echo "[INFO] Including config file ${cfg}"
+        cp "${cfg}" "${generated_cfg_dir}/${cfg_name}"
+        echo "exec generated.d/${cfg_name}" >>"${generated_cfg}"
+    done
+else
+    echo "[WARN] No \$TF_CFG_DIR specified; running with defaults"
+fi
+
+if test -n "${TF_MAP_ROTATION}"; then
+    mapcycle="${game_cfg_dir}/mapcycle.txt"
+    : >"${mapcycle}"
+
+    printf '%s\n' "${TF_MAP_ROTATION}" | tr ',' '\n' | while IFS= read -r map_name; do
+        map_name="$(printf '%s' "${map_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        test -z "${map_name}" && continue
+
+        case "${map_name}" in
+        *[!A-Za-z0-9_-]*)
+            echo "[ERROR] Invalid map name '${map_name}' in \$TF_MAP_ROTATION"
+            return 1
+            ;;
+        esac
+
+        echo "${map_name}" >>"${mapcycle}"
+    done || return 1
+
+    chown "${USERNAME}:${USERNAME}" "${mapcycle}"
+    echo "[INFO] Generated map rotation at ${mapcycle}"
+fi

@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+
+game_dir="/home/${USERNAME}/classified/tf2classified"
+baked_dir="/opt/tf2classified-modding"
+metamod_marker="${game_dir}/.metamod-version"
+sourcemod_marker="${game_dir}/.sourcemod-version"
+metamod_sentinel="${game_dir}/addons/metamod/bin/server.so"
+sourcemod_sentinel="${game_dir}/addons/sourcemod/plugins/admin-flatfile.smx"
+
+if test -f "${metamod_marker}" &&
+    test "$(cat "${metamod_marker}")" = "${TF_METAMOD_VERSION}" &&
+    test -f "${sourcemod_marker}" &&
+    test "$(cat "${sourcemod_marker}")" = "${TF_SOURCEMOD_VERSION}" &&
+    test -f "${metamod_sentinel}" &&
+    test -f "${sourcemod_sentinel}"; then
+    echo "[INFO] MetaMod ${TF_METAMOD_VERSION} and SourceMod ${TF_SOURCEMOD_VERSION} are already installed"
+    return 0
+fi
+
+echo "[INFO] Installing baked MetaMod ${TF_METAMOD_VERSION} and SourceMod ${TF_SOURCEMOD_VERSION}"
+cp -a "${baked_dir}/." "${game_dir}/" || return 1
+
+test -f "${metamod_sentinel}" || {
+    echo "[ERROR] Baked MetaMod installation is missing ${metamod_sentinel}"
+    return 1
+}
+test -f "${sourcemod_sentinel}" || {
+    echo "[ERROR] Baked SourceMod installation is missing ${sourcemod_sentinel}"
+    return 1
+}
+
+printf '%s\n' "${TF_METAMOD_VERSION}" >"${metamod_marker}"
+printf '%s\n' "${TF_SOURCEMOD_VERSION}" >"${sourcemod_marker}"
+chown -R "${USERNAME}:${USERNAME}" "${game_dir}/addons"
+chown "${USERNAME}:${USERNAME}" "${metamod_marker}" "${sourcemod_marker}"
+echo "[INFO] Installed MetaMod and SourceMod"

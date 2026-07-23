@@ -1,0 +1,52 @@
+#!/usr/bin/env sh
+
+install_steam_app() {
+    app_id="$1"
+    install_dir="$2"
+    app_name="$3"
+    required_file="$4"
+    attempt=1
+
+    while test "${attempt}" -le 3; do
+        echo "[INFO] Refreshing Steam metadata for ${app_name} (attempt ${attempt}/3)"
+        gosu "${USERNAME}" /opt/steamcmd/steamcmd.sh \
+            +login anonymous \
+            +app_info_update 1 \
+            +app_info_print "${app_id}" \
+            +quit || true
+
+        echo "[INFO] Installing ${app_name} into ${install_dir}"
+        if gosu "${USERNAME}" /opt/steamcmd/steamcmd.sh \
+            +force_install_dir "${install_dir}" \
+            +login anonymous \
+            +app_update "${app_id}" validate \
+            +quit &&
+            test -f "${required_file}"; then
+            return 0
+        fi
+
+        echo "[WARN] SteamCMD failed to install ${app_name}"
+        rm -f "/home/${USERNAME}/Steam/appcache/appinfo.vdf"
+        attempt=$((attempt + 1))
+    done
+
+    echo "[ERROR] Failed to install ${app_name} after 3 attempts"
+    return 1
+}
+
+install_steam_app \
+    "${TF2_APPID}" \
+    "/home/${USERNAME}/tf" \
+    "TF2" \
+    "/home/${USERNAME}/tf/tf/tf2_misc_dir.vpk" || return 1
+
+install_steam_app \
+    "${TF2_CLASSIFIED_APPID}" \
+    "/home/${USERNAME}/classified" \
+    "TF2 Classified" \
+    "/home/${USERNAME}/classified/srcds.sh" || return 1
+
+test -f "/home/${USERNAME}/.steam/sdk64/steamclient.so" || {
+    echo "[INFO] Installing steamclient.so"
+    ln -sf "/home/${USERNAME}/classified/linux64/steamclient.so" "/home/${USERNAME}/.steam/sdk64/steamclient.so"
+}

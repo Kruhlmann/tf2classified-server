@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+
+test -n "${TF_MAP_ROTATION}" || return 0
+
+mapcycle="/home/${USERNAME}/classified/tf2classified/cfg/mapcycle.txt"
+classified_maps="/home/${USERNAME}/classified/tf2classified/maps"
+tf_maps="/home/${USERNAME}/tf/maps"
+tf_game_maps="/home/${USERNAME}/tf/tf/maps"
+missing_maps=""
+
+test -s "${mapcycle}" || {
+    echo "[ERROR] \$TF_MAP_ROTATION is set but ${mapcycle} is missing or empty"
+    return 1
+}
+
+while IFS= read -r map_name; do
+    test -z "${map_name}" && continue
+
+    if test -f "${classified_maps}/${map_name}.bsp" ||
+        test -f "${tf_maps}/${map_name}.bsp" ||
+        test -f "${tf_game_maps}/${map_name}.bsp"; then
+        echo "[INFO] Validated rotation map ${map_name}"
+    else
+        missing_maps="${missing_maps} ${map_name}"
+    fi
+done <"${mapcycle}"
+
+test -z "${missing_maps}" || {
+    echo "[ERROR] Missing maps required by \$TF_MAP_ROTATION:"
+    for map_name in ${missing_maps}; do
+        echo "  - ${map_name}"
+    done
+    return 1
+}
+
+echo "[INFO] All maps required by \$TF_MAP_ROTATION are available"

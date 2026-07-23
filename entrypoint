@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+
+set -a
+
+if ! test "${DISABLE_ENTRYPOINT}" = "1"; then
+    for f in /entrypoint.d/*; do
+        if [ -f "$f" ]; then
+            echo "[INFO] Executing pre launch step $f..."
+            exec 1>&1
+            . "$f" || {
+                echo "[ERROR] Failed to execute $f"
+                exit 1
+            }
+        fi
+    done
+else
+    echo "[INFO] Skipping entrypoint scripts execution." >/dev/stderr
+fi
+
+if test -n "${USERNAME}"; then
+    exec gosu "${USERNAME}" "$@"
+else
+    echo "[WARN] No \$USERNAME, running as root"
+    exec "$@"
+fi
