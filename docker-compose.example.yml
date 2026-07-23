@@ -1,6 +1,6 @@
 services:
     tf2classified:
-      image: tf2classified-server:latest
+      image: ghcr.io/kruhlmann/tf2classified-server:latest
       restart: unless-stopped
       environment:
         TF_PORT: 27015
